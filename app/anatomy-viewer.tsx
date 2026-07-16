@@ -102,6 +102,35 @@ function slugify(value: string) {
     .replace(/^-+|-+$/g, "");
 }
 
+// The HuBMAP GLBs use their anatomical-source names (for example,
+// "left cardiac atrium") rather than the concise ids used by DiagramLens.
+// Keep that vocabulary bridge explicit so selected study labels highlight the
+// correct, real GLB mesh instead of a generic fallback shape.
+const referencePartAliases: Record<string, string[]> = {
+  left_atrium: ["left-cardiac-atrium"],
+  right_atrium: ["right-cardiac-atrium"],
+  left_ventricle: ["heart-left-ventricle"],
+  right_ventricle: ["heart-right-ventricle"],
+  cerebrum: ["brain-hemisphere"],
+  brainstem: ["pons", "medulla-oblongata", "midbrain"],
+  amygdala: ["amygdaloid-complex"],
+  medulla: ["medulla-oblongata"],
+  left_lung: ["lungs-l"],
+  right_lung: ["lungs-r"],
+  left_upper_lobe: ["lungs-l-upper-lobe"],
+  left_lower_lobe: ["lungs-l-lower-lobe"],
+  right_upper_lobe: ["lungs-r-upper-lobe"],
+  right_middle_lobe: ["lungs-r-middle-lobe"],
+  right_lower_lobe: ["lungs-r-lower-lobe"],
+  left_kidney: ["left-kidney"],
+  right_kidney: ["right-kidney"],
+  renal_cortex: ["cortex-of-kidney"],
+  renal_medulla: ["renal-medulla"],
+  renal_capsule: ["kidney-capsule"],
+  renal_hilum: ["hilum-of-kidney"],
+  optic_disc: ["optic-disc"]
+};
+
 function findPartForReferenceObject(
   object: InstanceType<typeof THREE.Object3D>,
   parts: VisionPart[]
@@ -118,7 +147,11 @@ function findPartForReferenceObject(
 
   return (
     parts.find((part) => {
-      const identifiers = [slugify(part.id), slugify(part.name)];
+      const identifiers = [
+        slugify(part.id),
+        slugify(part.name),
+        ...(referencePartAliases[part.id] ?? [])
+      ];
       return nodeNames.some((nodeName) =>
         identifiers.some(
           (identifier) =>
@@ -1632,14 +1665,18 @@ function ViewerCanvas({
     const raycaster = new THREE.Raycaster();
     const pointer = new THREE.Vector2();
     const clickableMeshes = visuals.map((visual) => visual.object);
-    const referenceAssetUrl = result.atlasMetadata?.referenceAssetUrl;
+    const referenceAssetUrls = result.atlasMetadata?.referenceAssetUrl
+      ? Array.isArray(result.atlasMetadata.referenceAssetUrl)
+        ? result.atlasMetadata.referenceAssetUrl
+        : [result.atlasMetadata.referenceAssetUrl]
+      : [];
     const referenceAnchors = new Map<
       string,
       InstanceType<typeof THREE.Object3D>
     >();
     const referenceMeshes: ReferenceMesh[] = [];
     let referenceModelLoaded = false;
-    let referenceModelPending = Boolean(referenceAssetUrl);
+    let referenceModelPending = referenceAssetUrls.length > 0;
     let disposed = false;
     const resizeObserver = new ResizeObserver(() => {
       const { clientWidth, clientHeight } = viewport;
@@ -1650,19 +1687,25 @@ function ViewerCanvas({
 
     resizeObserver.observe(viewport);
 
-    if (referenceAssetUrl) {
+    if (referenceAssetUrls.length > 0) {
       const loader = new GLTFLoader();
       loader.setCrossOrigin("anonymous");
-      loader.load(
-        referenceAssetUrl,
-        (gltf) => {
+      void Promise.all(referenceAssetUrls.map((url) => loader.loadAsync(url)))
+        .then((gltfs) => {
           if (disposed) {
-            disposeObject3D(gltf.scene);
+            for (const gltf of gltfs) {
+              disposeObject3D(gltf.scene);
+            }
             return;
           }
 
-          centerReferenceModel(gltf.scene);
-          gltf.scene.traverse((object: InstanceType<typeof THREE.Object3D>) => {
+          const assembledReferenceModel = new THREE.Group();
+          for (const gltf of gltfs) {
+            assembledReferenceModel.add(gltf.scene);
+          }
+
+          centerReferenceModel(assembledReferenceModel);
+          assembledReferenceModel.traverse((object: InstanceType<typeof THREE.Object3D>) => {
             const candidate = object as InstanceType<typeof THREE.Mesh>;
             if (!candidate.isMesh) {
               return;
@@ -1696,20 +1739,18 @@ function ViewerCanvas({
             }
           });
 
-          referenceModelRoot.add(gltf.scene);
-          clickableMeshes.push(gltf.scene);
+          referenceModelRoot.add(assembledReferenceModel);
+          clickableMeshes.push(assembledReferenceModel);
           referenceModelLoaded = true;
           referenceModelPending = false;
           setReferenceModelState("reference");
-        },
-        undefined,
-        () => {
+        })
+        .catch(() => {
           if (!disposed) {
             referenceModelPending = false;
             setReferenceModelState("fallback");
           }
-        }
-      );
+        });
     } else {
       referenceModelPending = false;
       setReferenceModelState("fallback");
@@ -1786,6 +1827,13 @@ function ViewerCanvas({
         return;
       }
 
+      const projectedLabels: Array<{
+        partId: string;
+        x: number;
+        y: number;
+        side: "left" | "right";
+      }> = [];
+
       for (const visual of visuals) {
         const hidden = state.hiddenPartIds.has(visual.part.id);
         const matches =
@@ -1801,6 +1849,11 @@ function ViewerCanvas({
         }
 
         const referenceAnchor = referenceAnchors.get(visual.part.id);
+        if (referenceModelLoaded && !referenceAnchor) {
+          nextLayouts[visual.part.id] = { x: 0, y: 0, visible: false };
+          continue;
+        }
+
         (referenceAnchor ?? visual.object).getWorldPosition(tempCameraSpace);
         tempLabelOffset
           .copy(referenceAnchor ? new THREE.Vector3(0, 0.28, 0) : visual.placement.labelOffset)
@@ -1816,11 +1869,39 @@ function ViewerCanvas({
           tempCameraSpace.y >= -1.05 &&
           tempCameraSpace.y <= 1.05;
 
-        nextLayouts[visual.part.id] = {
-          x: ((tempCameraSpace.x + 1) * 0.5) * viewport.clientWidth,
+        if (!visible) {
+          nextLayouts[visual.part.id] = { x: 0, y: 0, visible: false };
+          continue;
+        }
+
+        const x = ((tempCameraSpace.x + 1) * 0.5) * viewport.clientWidth;
+        projectedLabels.push({
+          partId: visual.part.id,
+          x,
           y: ((1 - tempCameraSpace.y) * 0.5) * viewport.clientHeight,
-          visible
-        };
+          side: x < viewport.clientWidth / 2 ? "left" : "right"
+        });
+      }
+
+      // Keep anatomy callouts in tidy, collision-free rails on either side of
+      // the stage. The label stays associated with its mesh, but never sits on
+      // top of the model where it would obscure the structure being studied.
+      for (const side of ["left", "right"] as const) {
+        const sideLabels = projectedLabels
+          .filter((label) => label.side === side)
+          .sort((a, b) => a.y - b.y);
+        let previousY = 92;
+
+        for (const label of sideLabels) {
+          const y = Math.max(92, Math.min(viewport.clientHeight - 64, label.y));
+          const spacedY = Math.max(y, previousY + 44);
+          previousY = Math.min(viewport.clientHeight - 64, spacedY);
+          nextLayouts[label.partId] = {
+            x: side === "left" ? 100 : viewport.clientWidth - 100,
+            y: previousY,
+            visible: true
+          };
+        }
       }
 
       setLabelLayouts(nextLayouts);

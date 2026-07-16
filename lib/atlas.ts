@@ -16,7 +16,7 @@ export type AtlasCategory =
 export type AtlasModelMetadata = {
   assetLabel: string;
   assetFileName: string;
-  referenceAssetUrl: string;
+  referenceAssetUrl: string | string[];
   referenceAttribution: string;
   loaderHint: string;
   scaleHint: string;
@@ -91,13 +91,13 @@ export const atlasLibrary: AtlasOrgan[] = [
       surface: "rgba(251,113,133,0.1)"
     },
     model: {
-      assetLabel: "Cardiac cross-section",
-      assetFileName: "3d-vh-m-heart.glb",
-      referenceAssetUrl: `${humanReferenceAtlasAssetBase}/heart-male/v1.2/assets/3d-vh-m-heart.glb`,
+      assetLabel: "Human Reference Atlas heart",
+      assetFileName: "VH_M_Heart.glb",
+      referenceAssetUrl: "/models/human-reference-atlas/heart.glb",
       referenceAttribution: humanReferenceAtlasAttribution,
-      loaderHint: "Loads the Human Reference Atlas heart GLB; the local study mesh only appears while it loads or if you are offline.",
+      loaderHint: "Loads the bundled Human Reference Atlas heart GLB; its chambers and valves remain independently selectable.",
       scaleHint: "Compact organ scale with a slight left-facing tilt.",
-      statusLabel: "Interactive 3D model"
+      statusLabel: "Verified local 3D model"
     },
     parts: [
       {
@@ -107,10 +107,40 @@ export const atlasLibrary: AtlasOrgan[] = [
         function: "Collects incoming blood before it moves into the left ventricle."
       },
       {
+        id: "right_atrium",
+        name: "Right atrium",
+        description: "Receives blood returning from the body.",
+        function: "Passes deoxygenated blood into the right ventricle."
+      },
+      {
         id: "left_ventricle",
         name: "Left ventricle",
         description: "The strongest pumping chamber in the heart.",
         function: "Sends blood into the aorta for circulation."
+      },
+      {
+        id: "right_ventricle",
+        name: "Right ventricle",
+        description: "Pumping chamber on the right side of the heart.",
+        function: "Sends blood toward the lungs through the pulmonary valve."
+      },
+      {
+        id: "mitral_valve",
+        name: "Mitral valve",
+        description: "Two-leaflet valve between the left atrium and left ventricle.",
+        function: "Prevents blood from moving backward into the left atrium."
+      },
+      {
+        id: "tricuspid_valve",
+        name: "Tricuspid valve",
+        description: "Three-leaflet valve between the right atrium and right ventricle.",
+        function: "Prevents backflow into the right atrium."
+      },
+      {
+        id: "pulmonary_valve",
+        name: "Pulmonary valve",
+        description: "Semilunar valve at the exit of the right ventricle.",
+        function: "Keeps blood from returning to the right ventricle after ejection."
       },
       {
         id: "aortic_valve",
@@ -136,6 +166,26 @@ export const atlasLibrary: AtlasOrgan[] = [
         sourcePartId: "left_atrium",
         targetPartId: "left_ventricle",
         relation: "passes blood into"
+      },
+      {
+        sourcePartId: "right_atrium",
+        targetPartId: "right_ventricle",
+        relation: "passes blood into"
+      },
+      {
+        sourcePartId: "left_atrium",
+        targetPartId: "mitral_valve",
+        relation: "opens through"
+      },
+      {
+        sourcePartId: "right_atrium",
+        targetPartId: "tricuspid_valve",
+        relation: "opens through"
+      },
+      {
+        sourcePartId: "right_ventricle",
+        targetPartId: "pulmonary_valve",
+        relation: "pushes blood through"
       },
       {
         sourcePartId: "left_ventricle",
@@ -171,13 +221,13 @@ export const atlasLibrary: AtlasOrgan[] = [
       surface: "rgba(56,189,248,0.1)"
     },
     model: {
-      assetLabel: "Respiratory pair",
-      assetFileName: "3d-vh-m-lung.glb",
-      referenceAssetUrl: `${humanReferenceAtlasAssetBase}/lung-male/v1.3/assets/3d-vh-m-lung.glb`,
+      assetLabel: "Human Reference Atlas lungs",
+      assetFileName: "VH_M_Lung.glb",
+      referenceAssetUrl: "/models/human-reference-atlas/lungs.glb",
       referenceAttribution: humanReferenceAtlasAttribution,
-      loaderHint: "Loads the Human Reference Atlas lung GLB; the local study mesh only appears while it loads or if you are offline.",
+      loaderHint: "Loads the bundled Human Reference Atlas respiratory GLB with separable airway branches and lobes.",
       scaleHint: "Tall bilateral arrangement that fills the chest cavity.",
-      statusLabel: "Interactive 3D model"
+      statusLabel: "Verified local 3D model"
     },
     parts: [
       {
@@ -205,16 +255,34 @@ export const atlasLibrary: AtlasOrgan[] = [
         function: "Supports oxygen uptake through its larger paired surface."
       },
       {
-        id: "alveoli",
-        name: "Alveoli",
-        description: "Tiny air sacs where gas exchange happens.",
-        function: "Move oxygen into the blood and carbon dioxide out."
+        id: "left_upper_lobe",
+        name: "Left upper lobe",
+        description: "Superior lobe of the left lung.",
+        function: "Provides a major portion of the left lung's gas-exchange surface."
       },
       {
-        id: "diaphragm",
-        name: "Diaphragm",
-        description: "Domed muscle underneath the lungs.",
-        function: "Changes chest volume to drive inhalation and exhalation."
+        id: "left_lower_lobe",
+        name: "Left lower lobe",
+        description: "Inferior lobe of the left lung.",
+        function: "Provides a major portion of the left lung's gas-exchange surface."
+      },
+      {
+        id: "right_upper_lobe",
+        name: "Right upper lobe",
+        description: "Superior lobe of the right lung.",
+        function: "Receives air through the superior lobar bronchus."
+      },
+      {
+        id: "right_middle_lobe",
+        name: "Right middle lobe",
+        description: "Small central lobe unique to the right lung.",
+        function: "Receives air through the middle lobar bronchus."
+      },
+      {
+        id: "right_lower_lobe",
+        name: "Right lower lobe",
+        description: "Largest inferior lobe of the right lung.",
+        function: "Receives air through the inferior lobar bronchus."
       }
     ],
     relationships: [
@@ -235,23 +303,28 @@ export const atlasLibrary: AtlasOrgan[] = [
       },
       {
         sourcePartId: "left_lung",
-        targetPartId: "alveoli",
+        targetPartId: "left_upper_lobe",
+        relation: "contains"
+      },
+      {
+        sourcePartId: "left_lung",
+        targetPartId: "left_lower_lobe",
         relation: "contains"
       },
       {
         sourcePartId: "right_lung",
-        targetPartId: "alveoli",
+        targetPartId: "right_upper_lobe",
         relation: "contains"
       },
       {
-        sourcePartId: "diaphragm",
-        targetPartId: "left_lung",
-        relation: "creates pressure changes for"
+        sourcePartId: "right_lung",
+        targetPartId: "right_middle_lobe",
+        relation: "contains"
       },
       {
-        sourcePartId: "diaphragm",
-        targetPartId: "right_lung",
-        relation: "creates pressure changes for"
+        sourcePartId: "right_lung",
+        targetPartId: "right_lower_lobe",
+        relation: "contains"
       }
     ]
   },
@@ -272,13 +345,13 @@ export const atlasLibrary: AtlasOrgan[] = [
       surface: "rgba(192,132,252,0.1)"
     },
     model: {
-      assetLabel: "Sagittal brain",
-      assetFileName: "3d-f-brain.glb",
-      referenceAssetUrl: `${humanReferenceAtlasAssetBase}/brain-female/v1.3/assets/3d-f-brain.glb`,
+      assetLabel: "Allen Human Reference Brain",
+      assetFileName: "Allen_F_Brain.glb",
+      referenceAssetUrl: "/models/human-reference-atlas/brain.glb",
       referenceAttribution: humanReferenceAtlasAttribution,
-      loaderHint: "Loads the Human Reference Atlas brain GLB; the local study mesh only appears while it loads or if you are offline.",
+      loaderHint: "Loads the bundled Allen / Human Reference Atlas brain GLB with its detailed anatomical hierarchy.",
       scaleHint: "Side profile with stacked regions and a narrow stem.",
-      statusLabel: "Interactive 3D model"
+      statusLabel: "Verified local 3D model"
     },
     parts: [
       {
@@ -352,13 +425,16 @@ export const atlasLibrary: AtlasOrgan[] = [
       surface: "rgba(52,211,153,0.1)"
     },
     model: {
-      assetLabel: "Kidney section",
-      assetFileName: "3d-vh-m-kidney-r.glb",
-      referenceAssetUrl: `${humanReferenceAtlasAssetBase}/kidney-male-right/v1.2/assets/3d-vh-m-kidney-r.glb`,
+      assetLabel: "Human Reference Atlas kidney pair",
+      assetFileName: "VH_M_Kidney_L.glb + VH_M_Kidney_R.glb",
+      referenceAssetUrl: [
+        "/models/human-reference-atlas/kidney-left.glb",
+        "/models/human-reference-atlas/kidney-right.glb"
+      ],
       referenceAttribution: humanReferenceAtlasAttribution,
-      loaderHint: "Loads the Human Reference Atlas kidney GLB; the local study mesh only appears while it loads or if you are offline.",
+      loaderHint: "Loads the bundled left and right Human Reference Atlas kidney GLBs as one paired study model.",
       scaleHint: "Vertical bean-like volume with a central funnel.",
-      statusLabel: "Interactive 3D model"
+      statusLabel: "Verified local 3D model"
     },
     parts: [
       {
@@ -522,13 +598,13 @@ export const atlasLibrary: AtlasOrgan[] = [
       surface: "rgba(250,204,21,0.1)"
     },
     model: {
-      assetLabel: "Ocular globe",
-      assetFileName: "3d-vh-m-eye-r.glb",
-      referenceAssetUrl: `${humanReferenceAtlasAssetBase}/eye-male-right/v1.2/assets/3d-vh-m-eye-r.glb`,
+      assetLabel: "Human Reference Atlas eye",
+      assetFileName: "VH_M_Eye_L.glb",
+      referenceAssetUrl: "/models/human-reference-atlas/eye-left.glb",
       referenceAttribution: humanReferenceAtlasAttribution,
-      loaderHint: "Loads the Human Reference Atlas eye GLB; the local study mesh only appears while it loads or if you are offline.",
+      loaderHint: "Loads the bundled Human Reference Atlas eye GLB with separable optical structures.",
       scaleHint: "Small spherical profile with a forward-facing corneal dome.",
-      statusLabel: "Interactive 3D model"
+      statusLabel: "Verified local 3D model"
     },
     parts: [
       {

@@ -16,7 +16,7 @@ export type VisionAtlasMetadata = {
   diagramSubtitle: string;
   assetLabel: string;
   assetFileName: string;
-  referenceAssetUrl: string;
+  referenceAssetUrl: string | string[];
   referenceAttribution: string;
   loaderHint: string;
   scaleHint: string;
