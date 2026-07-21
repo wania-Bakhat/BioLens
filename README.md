@@ -60,8 +60,3 @@ The production build compiles the app, type-checks it, and verifies all API rout
 
 ## deployed on Vercel 
 link: (https://bio-lens-five.vercel.app/)
-
-## OpenAI Build Week notes
-
-BioLens is prepared for the **Education** track. The project uses Codex throughout product refinement, interaction implementation, API integration, and production verification. An OpenAI vision model is used to turn an uploaded anatomy image into the appropriate interactive 3D study; Codex was used to build and refine the surrounding product experience.
-
